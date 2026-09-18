@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MontiSmart - مونتي سمارت</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Babel (لترجمة كود React/JSX داخل المتصفح) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+    <!-- الحاوية الأساسية التي سيعمل بداخلها تطبيق React -->
+    <div id="root"></div>
+
+    <!-- كود React -->
+    <script type="text/babel" data-type="module">
+        // 1. استدعاء React من روابط CDN
+        import React, { useState, useEffect } from 'https://esm.sh/react@18';
+        import { createRoot } from 'https://esm.sh/react-dom@18/client';
+        
+        // 2. استدعاء الأيقونات
+        import { 
+          Settings, Users, BookOpen, LogOut, Trash2, UserPlus, 
+          Phone, ShieldCheck, BrainCircuit, HeartPulse, Activity, Baby, Edit3, Video 
+        } from 'https://esm.sh/lucide-react@0.344.0';
+
+        // 3. استدعاء Firebase (النسخة المتوافقة مع المتصفحات Modular V9)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, addDoc, setDoc, deleteDoc, doc, getDoc, query, where, limit } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+        // إعدادات Firebase الخاصة بك
+        const firebaseConfig = {
+          apiKey: "AIzaSyAHJITjCnWhdv629WCkYRgVPa6TxxH55-Y",
+          authDomain: "montismart.firebaseapp.com",
+          projectId: "montismart",
+          storageBucket: "montismart.firebasestorage.app",
+          messagingSenderId: "787008787995",
+          appId: "1:787008787995:web:9dd7bf81c8a52a8a004abe",
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // دالة مساعدة قوية لجلب صلاحية المستخدم بأمان
+        const getUserRole = async (email) => {
+          if (!email) return 'parent';
+          if (email.toLowerCase() === 'admin@montismart.com') return 'admin';
+
+          try {
+            const q = query(collection(db, 'users'), where("email", "==", email), limit(1));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) return snapshot.docs[0].data().role || 'parent';
+
+            const docSnap = await getDoc(doc(db, 'users', email));
+            if (docSnap.exists()) return docSnap.data().role || 'parent';
+          } catch (error) { console.error(error); }
+          return 'parent'; 
+        };
+
+        const AdminDashboard = ({ handleLogout, user }) => {
+          const [activeTab, setActiveTab] = useState('settings');
+          
+          // States
+          const [whatsapp, setWhatsapp] = useState('');
+          const [cameraLink, setCameraLink] = useState('');
+          const [msgSettings, setMsgSettings] = useState({ text: '', type: '' });
+          
+          const [usersList, setUsersList] = useState([]);
+          const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'teacher' });
+          const [msgUser, setMsgUser] = useState({ text: '', type: '' });
+
+          const [classesList, setClassesList] = useState([]);
+          const [classForm, setClassForm] = useState({ name: '', teacherId: '' });
+          const [msgClass, setMsgClass] = useState({ text: '', type: '' });
+
+          const [studentsList, setStudentsList] = useState([]);
+          const [studentForm, setStudentForm] = useState({ name: '', dob: '', medicalInfo: '', classId: '', parentId: '' });
+          const [msgStudent, setMsgStudent] = useState({ text: '', type: '' });
+
+          useEffect(() => {
+            fetchUsers(); fetchClasses(); fetchSettings(); fetchStudents();
+          }, []);
+
+          const fetchSettings = async () => {
+            try {
+              const docSnap = await getDoc(doc(db, 'settings', 'general'));
+              if (docSnap.exists()) {
+                if (docSnap.data().whatsapp) setWhatsapp(docSnap.data().whatsapp);
+                if (docSnap.data().cameraLink) setCameraLink(docSnap.data().cameraLink);
+              }
+            } catch (error) { console.error(error); }
+          };
+
+          const fetchUsers = async () => {
+            try {
+              const snapshot = await getDocs(collection(db, 'users'));
+              setUsersList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } catch (error) { console.error(error); }
+          };
+
+          const fetchClasses = async () => {
+            try {
+              const snapshot = await getDocs(collection(db, 'classes'));
+              setClassesList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } catch (error) { console.error(error); }
+          };
+
+          const fetchStudents = async () => {
+            try {
+              const snapshot = await getDocs(collection(db, 'students'));
+              setStudentsList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } catch (error) { console.error(error); }
+          };
+
+          const handleUpdateSettings = async (e) => {
+            e.preventDefault();
+            setMsgSettings({text: 'جاري الحفظ...', type: 'info'});
+            try {
+              await setDoc(doc(db, 'settings', 'general'), { whatsapp: whatsapp, cameraLink: cameraLink }, { merge: true });
+              setMsgSettings({text: 'تم تحديث الإعدادات بنجاح!', type: 'success'});
+            } catch (error) { setMsgSettings({text: 'حدث خطأ أثناء الحفظ.', type: 'error'}); }
+            setTimeout(() => setMsgSettings({text: '', type: ''}), 3000);
+          };
+
+          const handleCreateUser = async (e) => {
+            e.preventDefault();
+            setMsgUser({text: 'جاري الإنشاء...', type: 'info'});
+            try {
+              const secondaryApp = initializeApp(firebaseConfig, "Secondary");
+              const secondaryAuth = getAuth(secondaryApp);
+              await createUserWithEmailAndPassword(secondaryAuth, userForm.email, userForm.password);
+              
+              await setDoc(doc(db, 'users', userForm.email.toLowerCase()), {
+                name: userForm.name,
+                email: userForm.email.toLowerCase(),
+                role: userForm.role,
+                createdAt: new Date().toISOString()
+              });
+
+              setMsgUser({text: 'تم إنشاء المستخدم بنجاح!', type: 'success'});
+              setUserForm({ name: '', email: '', password: '', role: 'teacher' });
+              fetchUsers();
+            } catch (error) { 
+              let errorMsg = error.message;
+              if (error.code === 'auth/email-already-in-use') errorMsg = 'عذراً.. هذا البريد الإلكتروني مسجل بالفعل لمستخدم آخر!';
+              if (error.code === 'auth/weak-password') errorMsg = 'كلمة المرور ضعيفة جداً، يجب أن لا تقل عن 6 أحرف.';
+              setMsgUser({text: errorMsg, type: 'error'}); 
+            }
+            setTimeout(() => setMsgUser({text: '', type: ''}), 5000);
+          };
+
+          const handleDeleteUser = async (id) => {
+            try { await deleteDoc(doc(db, 'users', id)); fetchUsers(); } catch (err) { console.error(err); }
+          };
+
+          const handleCreateClass = async (e) => {
+            e.preventDefault();
+            setMsgClass({text: 'جاري الإنشاء...', type: 'info'});
+            try {
+              await addDoc(collection(db, 'classes'), {
+                name: classForm.name,
+                teacherId: classForm.teacherId,
+                createdAt: new Date().toISOString()
+              });
+              setMsgClass({text: 'تم إنشاء الفصل بنجاح!', type: 'success'});
+              setClassForm({ name: '', teacherId: '' });
+              fetchClasses();
+            } catch (error) { setMsgClass({text: 'حدث خطأ.', type: 'error'}); }
+            setTimeout(() => setMsgClass({text: '', type: ''}), 3000);
+          };
+
+          const handleDeleteClass = async (id) => {
+            try { await deleteDoc(doc(db, 'classes', id)); fetchClasses(); } catch (err) { console.error(err); }
+          };
+
+          const handleCreateStudent = async (e) => {
+            e.preventDefault();
+            setMsgStudent({text: 'جاري الإضافة...', type: 'info'});
+            try {
+              await addDoc(collection(db, 'students'), {
+                name: studentForm.name,
+                dob: studentForm.dob,
+                medicalInfo: studentForm.medicalInfo,
+                classId: studentForm.classId,
+                parentId: studentForm.parentId,
+                createdAt: new Date().toISOString()
+              });
+              setMsgStudent({text: 'تم إضافة الطفل بنجاح!', type: 'success'});
+              setStudentForm({ name: '', dob: '', medicalInfo: '', classId: '', parentId: '' });
+              fetchStudents();
+            } catch (error) { setMsgStudent({text: 'حدث خطأ.', type: 'error'}); }
+            setTimeout(() => setMsgStudent({text: '', type: ''}), 3000);
+          };
+
+          const handleDeleteStudent = async (id) => {
+            try { await deleteDoc(doc(db, 'students', id)); fetchStudents(); } catch (err) { console.error(err); }
+          };
+
+          const teachersList = usersList.filter(u => u.role === 'teacher');
+          const parentsList = usersList.filter(u => u.role === 'parent');
+
+          return (
+            <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row" dir="rtl">
+              
+              {/* Sidebar Navigation */}
+              <div className="w-full md:w-72 bg-white border-b md:border-l border-gray-200 flex flex-col z-10 sticky top-0 md:h-screen">
+                <div className="p-6 border-b border-gray-100 hidden md:block">
+                  <h2 className="text-2xl font-black text-gray-800 tracking-tight">مونتي <span className="text-blue-600">سمارت</span></h2>
+                  <p className="text-sm text-gray-500 mt-1">لوحة الإدارة</p>
+                </div>
+                
+                <nav className="flex md:flex-col gap-2 p-4 overflow-x-auto md:overflow-visible">
+                  <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold whitespace-nowrap transition-colors ${activeTab === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
+                    <Settings className="w-5 h-5" /> الإعدادات
+                  </button>
+                  <button onClick={() => setActiveTab('users')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold whitespace-nowrap transition-colors ${activeTab === 'users' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
+                    <Users className="w-5 h-5" /> المستخدمين
+                  </button>
+                  <button onClick={() => setActiveTab('classes')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold whitespace-nowrap transition-colors ${activeTab === 'classes' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
+                    <BookOpen className="w-5 h-5" /> الفصول
+                  </button>
+                  <button onClick={() => setActiveTab('students')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold whitespace-nowrap transition-colors ${activeTab === 'students' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}>
+                    <Baby className="w-5 h-5" /> الأطفال
+                  </button>
+                  
+                  <div className="md:mt-auto">
+                    <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-red-600 hover:bg-red-50 w-full transition-colors whitespace-nowrap">
+                      <LogOut className="w-5 h-5" /> خروج
+                    </button>
+                  </div>
+                </nav>
+              </div>
+
+              {/* Main Content Area */}
+              <div className="flex-1 p-6 md:p-10 overflow-y-auto">
+                
+                {activeTab === 'settings' && (
+                  <div className="max-w-2xl space-y-8 animate-in fade-in">
+                    <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2 border-b pb-4"><Settings className="text-blue-600" /> إعدادات الموقع العامة</h3>
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                      <h4 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2">
+                        <Settings className="w-5 h-5 text-gray-500"/> روابط الاتصال والتطبيقات
+                      </h4>
+                      {msgSettings.text && <div className={`p-4 rounded-xl text-sm font-bold mb-6 ${msgSettings.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{msgSettings.text}</div>}
+                      <form onSubmit={handleUpdateSettings} className="space-y-4">
+                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                          <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2"><Phone className="w-4 h-4 text-green-500"/> رقم التواصل (WhatsApp):</label>
+                          <input type="text" placeholder="مثال: 201012345678" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono" dir="ltr" />
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                          <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2"><Video className="w-4 h-4 text-blue-500"/> رابط تطبيق الكاميرات (البث المباشر):</label>
+                          <input type="url" placeholder="https://..." value={cameraLink} onChange={(e) => setCameraLink(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono" dir="ltr" />
+                          <p className="text-xs text-gray-500 mt-2">هذا الرابط سيظهر لأولياء الأمور في لوحة التحكم لفتح تطبيق الكاميرا.</p>
+                        </div>
+                        <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-sm mt-4">
+                          حفظ التعديلات
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'users' && (
+                  <div className="space-y-8 animate-in fade-in">
+                    <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2 border-b pb-4"><Users className="text-blue-600" /> إدارة النظام والمستخدمين</h3>
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                        <h4 className="text-lg font-bold text-gray-700 mb-4">إنشاء حساب جديد</h4>
+                        {msgUser.text && <div className={`p-3 rounded-xl text-sm font-bold mb-4 ${msgUser.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{msgUser.text}</div>}
+                        <form onSubmit={handleCreateUser} className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">الاسم الكامل</label>
+                            <input required type="text" value={userForm.name} onChange={e=>setUserForm({...userForm, name:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">البريد الإلكتروني</label>
+                            <input required type="email" value={userForm.email} onChange={e=>setUserForm({...userForm, email:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50" dir="ltr" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">كلمة المرور</label>
+                            <input required type="password" value={userForm.password} onChange={e=>setUserForm({...userForm, password:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50" dir="ltr" minLength="6" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">نوع الحساب</label>
+                            <select value={userForm.role} onChange={e=>setUserForm({...userForm, role:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 font-semibold cursor-pointer">
+                              <option value="teacher">مدرس / معلم</option>
+                              <option value="parent">ولي أمر</option>
+                              <option value="admin">إدارة (أدمن)</option>
+                            </select>
+                          </div>
+                          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all mt-2">إنشاء الحساب</button>
+                        </form>
+                      </div>
+
+                      <div className="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
+                          <h4 className="font-bold text-gray-700">المستخدمين ({usersList.length})</h4>
+                          <button onClick={fetchUsers} className="text-sm text-blue-600 font-bold hover:underline">تحديث القائمة</button>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-right text-sm">
+                            <thead className="bg-gray-100 text-gray-600">
+                              <tr><th className="p-4">الاسم</th><th className="p-4">البريد</th><th className="p-4">الصلاحية</th><th className="p-4 text-center">إجراء</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {usersList.map(u => (
+                                <tr key={u.id} className="hover:bg-gray-50">
+                                  <td className="p-4 font-bold text-gray-800 whitespace-nowrap">{u.name || '-'}</td>
+                                  <td className="p-4 text-gray-500 whitespace-nowrap" dir="ltr">{u.email}</td>
+                                  <td className="p-4 whitespace-nowrap">
+                                    <span className={`px-2 py-1 rounded-md text-xs font-bold ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : u.role === 'teacher' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                      {u.role === 'admin' ? 'أدمن' : u.role === 'teacher' ? 'مدرس' : 'ولي أمر'}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-center">
+                                    <button onClick={()=>handleDeleteUser(u.id)} className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'classes' && (
+                  <div className="space-y-8 animate-in fade-in">
+                    <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2 border-b pb-4"><BookOpen className="text-blue-600" /> إدارة الفصول</h3>
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                        <h4 className="text-lg font-bold text-gray-700 mb-4">إنشاء فصل جديد</h4>
+                        {msgClass.text && <div className={`p-3 rounded-xl text-sm font-bold mb-4 ${msgClass.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{msgClass.text}</div>}
+                        <form onSubmit={handleCreateClass} className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">اسم الفصل</label>
+                            <input required type="text" value={classForm.name} onChange={e=>setClassForm({...classForm, name:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">المعلم المسؤول</label>
+                            <select required value={classForm.teacherId} onChange={e=>setClassForm({...classForm, teacherId:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 font-semibold cursor-pointer">
+                              <option value="">-- اختر المعلم --</option>
+                              {teachersList.map(t => <option key={t.id} value={t.email}>{t.name} ({t.email})</option>)}
+                            </select>
+                          </div>
+                          <button type="submit" disabled={!classForm.teacherId} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-all mt-2 disabled:opacity-50">إنشاء الفصل</button>
+                        </form>
+                      </div>
+
+                      <div className="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
+                          <h4 className="font-bold text-gray-700">الفصول الحالية ({classesList.length})</h4>
+                          <button onClick={fetchClasses} className="text-sm text-blue-600 font-bold hover:underline">تحديث القائمة</button>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-right text-sm">
+                            <thead className="bg-gray-100 text-gray-600">
+                              <tr><th className="p-4">اسم الفصل</th><th className="p-4">المعلم المسؤول</th><th className="p-4 text-center">إجراء</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {classesList.map(c => {
+                                const teacher = usersList.find(u => u.email === c.teacherId || u.id === c.teacherId);
+                                return (
+                                  <tr key={c.id} className="hover:bg-gray-50">
+                                    <td className="p-4 font-bold text-gray-800 whitespace-nowrap">{c.name}</td>
+                                    <td className="p-4 text-blue-600 font-bold whitespace-nowrap">{teacher ? teacher.name : (c.teacherId || 'غير معروف')}</td>
+                                    <td className="p-4 text-center">
+                                      <button onClick={()=>handleDeleteClass(c.id)} className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'students' && (
+                  <div className="space-y-8 animate-in fade-in">
+                    <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2 border-b pb-4"><Baby className="text-blue-600" /> تسجيل ملفات الأطفال</h3>
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                        <h4 className="text-lg font-bold text-gray-700 mb-4">إضافة طفل جديد</h4>
+                        {msgStudent.text && <div className={`p-3 rounded-xl text-sm font-bold mb-4 ${msgStudent.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{msgStudent.text}</div>}
+                        <form onSubmit={handleCreateStudent} className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">اسم الطفل</label>
+                            <input required type="text" value={studentForm.name} onChange={e=>setStudentForm({...studentForm, name:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">تاريخ الميلاد</label>
+                            <input required type="date" value={studentForm.dob} onChange={e=>setStudentForm({...studentForm, dob:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">تعيين ولي الأمر</label>
+                            <select required value={studentForm.parentId} onChange={e=>setStudentForm({...studentForm, parentId:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 font-semibold cursor-pointer">
+                              <option value="">-- اختر ولي الأمر --</option>
+                              {parentsList.map(p => <option key={p.id} value={p.email}>{p.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">تسكين في فصل</label>
+                            <select required value={studentForm.classId} onChange={e=>setStudentForm({...studentForm, classId:e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 font-semibold cursor-pointer">
+                              <option value="">-- اختر الفصل --</option>
+                              {classesList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                          </div>
+                          <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-all mt-2">حفظ ملف الطفل</button>
+                        </form>
+                      </div>
+
+                      <div className="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
+                          <h4 className="font-bold text-gray-700">الأطفال المسجلين ({studentsList.length})</h4>
+                          <button onClick={fetchStudents} className="text-sm text-blue-600 font-bold hover:underline">تحديث القائمة</button>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-right text-sm">
+                            <thead className="bg-gray-100 text-gray-600">
+                              <tr><th className="p-4">الاسم</th><th className="p-4">الفصل</th><th className="p-4">ولي الأمر</th><th className="p-4 text-center">إجراء</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {studentsList.map(student => {
+                                const studentClass = classesList.find(c => c.id === student.classId);
+                                const parent = usersList.find(p => p.email === student.parentId || p.id === student.parentId);
+                                return (
+                                  <tr key={student.id} className="hover:bg-gray-50">
+                                    <td className="p-4 font-bold text-gray-800 whitespace-nowrap">{student.name}</td>
+                                    <td className="p-4 text-blue-600 font-bold whitespace-nowrap">{studentClass ? studentClass.name : '-'}</td>
+                                    <td className="p-4 text-gray-800 whitespace-nowrap">{parent ? parent.name : '-'}</td>
+                                    <td className="p-4 text-center">
+                                      <button onClick={()=>handleDeleteStudent(student.id)} className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        };
+
+        const TeacherDashboard = ({ handleLogout, user }) => {
+          const [myClasses, setMyClasses] = useState([]);
+          const [myStudents, setMyStudents] = useState([]);
+          const [loading, setLoading] = useState(true);
+          
+          const [selectedStudent, setSelectedStudent] = useState(null);
+          const [reportForm, setReportForm] = useState({ academic: '', skills: '', health: '', notes: '' });
+          const [msgReport, setMsgReport] = useState({ text: '', type: '' });
+
+          useEffect(() => {
+            fetchMyStudents();
+          }, []);
+
+          const fetchMyStudents = async () => {
+            setLoading(true);
+            try {
+              const classSnap = await getDocs(collection(db, 'classes'));
+              const allClasses = classSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              
+              const classes = allClasses.filter(c => c.teacherId?.toLowerCase() === user.email.toLowerCase());
+              
+              setMyClasses(classes);
+              const classIds = classes.map(doc => doc.id);
+
+              if (classIds.length > 0) {
+                const studentSnap = await getDocs(collection(db, 'students'));
+                const allStudents = studentSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const students = allStudents.filter(s => classIds.includes(s.classId));
+                setMyStudents(students);
+              }
+            } catch (error) { console.error("Error fetching students:", error); }
+            setLoading(false);
+          };
+
+          const handleSubmitReport = async (e) => {
+            e.preventDefault();
+            setMsgReport({text: 'جاري الإرسال...', type: 'info'});
+            try {
+              await addDoc(collection(db, 'reports'), {
+                studentId: selectedStudent.id,
+                teacherEmail: user.email,
+                ...reportForm,
+                createdAt: new Date().toISOString()
+              });
+              setMsgReport({text: 'تم إرسال التقرير لولي الأمر بنجاح!', type: 'success'});
+              setReportForm({ academic: '', skills: '', health: '', notes: '' });
+              setTimeout(() => { setMsgReport({text:'', type:''}); setSelectedStudent(null); }, 2000);
+            } catch (error) { setMsgReport({text: 'حدث خطأ.', type: 'error'}); }
+          };
+
+          return (
+            <div className="min-h-screen bg-green-50" dir="rtl">
+              <header className="bg-white border-b border-green-100 p-4 sticky top-0 z-10 shadow-sm">
+                <div className="container mx-auto flex justify-between items-center">
+                  <div>
+                    <h1 className="text-2xl font-black text-green-700 flex items-center gap-2"><BookOpen/> بوابة المعلمين</h1>
+                    <p className="text-gray-500 text-sm font-bold mt-1">مرحباً بك أ. {user.email.split('@')[0]}</p>
+                  </div>
+                  <button onClick={handleLogout} className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-xl font-bold transition-all"><LogOut className="w-4 h-4"/> خروج</button>
+                </div>
+              </header>
+
+              <main className="container mx-auto p-4 py-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Users className="text-green-600"/> أطفال فصلي ({myStudents.length})</h2>
+                  <button onClick={fetchMyStudents} className="text-sm bg-white border border-gray-200 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-50">تحديث البيانات</button>
+                </div>
+
+                {loading ? (
+                  <div className="text-center py-20 text-gray-500 font-bold">جاري تحميل البيانات...</div>
+                ) : myClasses.length === 0 ? (
+                  <div className="bg-white p-10 rounded-2xl shadow-sm text-center border border-red-100">
+                    <BookOpen className="w-12 h-12 text-red-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">لست مسؤولاً عن أي فصل حالياً</h3>
+                    <p className="text-gray-500">عفواً، لم تقم الإدارة بتعيينك كمعلم لأي فصل حتى الآن. يرجى التواصل مع السكرتارية.</p>
+                  </div>
+                ) : myStudents.length === 0 ? (
+                  <div className="bg-white p-10 rounded-2xl shadow-sm text-center border border-orange-100">
+                    <Users className="w-12 h-12 text-orange-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">الفصل فارغ</h3>
+                    <p className="text-gray-500">أنت مسؤول عن فصل ({myClasses.map(c=>c.name).join(', ')}) لكن لا يوجد به أطفال مسجلين حالياً.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {myStudents.map(student => {
+                      const sClass = myClasses.find(c => c.id === student.classId);
+                      return (
+                        <div key={student.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden">
+                          <div className="absolute top-0 right-0 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-bl-lg">{sClass?.name}</div>
+                          <div className="flex items-center gap-4 mb-4 mt-2">
+                            <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-green-600 font-bold text-xl">{student.name.charAt(0)}</div>
+                            <div>
+                              <h3 className="font-bold text-gray-800 text-lg">{student.name}</h3>
+                              <p className="text-xs text-gray-500">تاريخ الميلاد: {student.dob}</p>
+                            </div>
+                          </div>
+                          {student.medicalInfo && (
+                            <div className="bg-orange-50 text-orange-700 p-3 rounded-xl text-sm mb-4 border border-orange-100">
+                              <span className="font-bold flex items-center gap-1 mb-1"><HeartPulse className="w-4 h-4"/> ملاحظات طبية/حساسية:</span>
+                              {student.medicalInfo}
+                            </div>
+                          )}
+                          <button onClick={() => setSelectedStudent(student)} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 mt-auto">
+                            <Edit3 className="w-4 h-4" /> كتابة تقرير أسبوعي
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </main>
+
+              {/* Report Modal */}
+              {selectedStudent && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+                      <h3 className="font-bold text-xl text-gray-800">تقرير الطفل: <span className="text-green-600">{selectedStudent.name}</span></h3>
+                      <button onClick={() => setSelectedStudent(null)} className="text-gray-400 hover:text-red-500 font-bold text-xl">&times;</button>
+                    </div>
+                    <div className="p-6 overflow-y-auto">
+                      {msgReport.text && <div className={`p-4 rounded-xl text-sm font-bold mb-4 ${msgReport.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{msgReport.text}</div>}
+                      <form id="reportForm" onSubmit={handleSubmitReport} className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1">المستوى الدراسي</label>
+                          <textarea required value={reportForm.academic} onChange={e=>setReportForm({...reportForm, academic: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" rows="2" placeholder="ماذا تعلم هذا الأسبوع؟"></textarea>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1">المستوى المهاري والسلوكي</label>
+                          <textarea required value={reportForm.skills} onChange={e=>setReportForm({...reportForm, skills: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" rows="2" placeholder="تفاعله مع زملائه، مهاراته الحركية..."></textarea>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1">الحالة الصحية والمزاجية</label>
+                          <textarea required value={reportForm.health} onChange={e=>setReportForm({...reportForm, health: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" rows="2" placeholder="شهيته، نشاطه، أي ملاحظات..."></textarea>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1">ملاحظات إضافية لولي الأمر</label>
+                          <textarea value={reportForm.notes} onChange={e=>setReportForm({...reportForm, notes: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none" rows="2"></textarea>
+                        </div>
+                      </form>
+                    </div>
+                    <div className="p-6 border-t bg-gray-50 mt-auto">
+                      <button form="reportForm" type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition-all shadow-sm">إرسال التقرير واعتماده</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        const ParentDashboard = ({ handleLogout, user }) => {
+          const [myChildren, setMyChildren] = useState([]);
+          const [loading, setLoading] = useState(true);
+          const [cameraLink, setCameraLink] = useState('');
+          
+          const [selectedChild, setSelectedChild] = useState(null);
+          const [childReports, setChildReports] = useState([]);
+          const [loadingReports, setLoadingReports] = useState(false);
+
+          const [editMedical, setEditMedical] = useState(false);
+          const [medicalText, setMedicalText] = useState('');
+          const [savingMed, setSavingMed] = useState(false);
+
+          useEffect(() => {
+            fetchMyChildren();
+            fetchCameraLink();
+          }, []);
+
+          const fetchCameraLink = async () => {
+            try {
+              const docSnap = await getDoc(doc(db, 'settings', 'general'));
+              if (docSnap.exists() && docSnap.data().cameraLink) {
+                setCameraLink(docSnap.data().cameraLink);
+              }
+            } catch (error) { console.error("Error fetching camera link:", error); }
+          };
+
+          const fetchMyChildren = async () => {
+            setLoading(true);
+            try {
+              const q = query(collection(db, 'students'), where("parentId", "==", user.email.toLowerCase()));
+              const snapshot = await getDocs(q);
+              const children = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              setMyChildren(children);
+            } catch (error) { console.error("Error fetching children:", error); }
+            setLoading(false);
+          };
+
+          const openChildProfile = async (child) => {
+            setSelectedChild(child);
+            setMedicalText(child.medicalInfo || '');
+            setEditMedical(false);
+            setLoadingReports(true);
+            try {
+              const q = query(collection(db, 'reports'), where("studentId", "==", child.id));
+              const snapshot = await getDocs(q);
+              const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+              setChildReports(reports);
+            } catch (error) { console.error("Error fetching reports:", error); }
+            setLoadingReports(false);
+          };
+
+          const handleSaveMedical = async () => {
+            setSavingMed(true);
+            try {
+              await setDoc(doc(db, 'students', selectedChild.id), { medicalInfo: medicalText }, { merge: true });
+              const updatedChild = { ...selectedChild, medicalInfo: medicalText };
+              setSelectedChild(updatedChild);
+              setMyChildren(myChildren.map(c => c.id === updatedChild.id ? updatedChild : c));
+              setEditMedical(false);
+            } catch (error) { alert("حدث خطأ أثناء الحفظ"); }
+            setSavingMed(false);
+          };
+
+          return (
+            <div className="min-h-screen bg-blue-50" dir="rtl">
+              <header className="bg-white border-b border-blue-100 p-4 sticky top-0 z-10 shadow-sm">
+                <div className="container mx-auto flex justify-between items-center">
+                  <div>
+                    <h1 className="text-2xl font-black text-blue-700 flex items-center gap-2"><Baby/> بوابة أولياء الأمور</h1>
+                    <p className="text-gray-500 text-sm font-bold mt-1">مرحباً بك، {user.email.split('@')[0]}</p>
+                  </div>
+                  <button onClick={handleLogout} className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-xl font-bold transition-all"><LogOut className="w-4 h-4"/> خروج</button>
+                </div>
+              </header>
+
+              <main className="container mx-auto p-4 py-8">
+                
+                {cameraLink && (
+                  <div className="mb-8 animate-in fade-in">
+                    <a href={cameraLink} target="_blank" rel="noreferrer" className="flex flex-col md:flex-row items-center justify-between gap-4 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white p-6 rounded-3xl shadow-lg transition-transform hover:scale-[1.01]">
+                      <div className="flex items-center gap-4">
+                        <div className="bg-white/20 p-3 rounded-2xl">
+                          <Video className="w-8 h-8 animate-pulse" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black">بث مباشر لكاميرات الحضانة</h3>
+                          <p className="text-red-100 font-semibold text-sm mt-1">تابع طفلك لحظة بلحظة وبأمان تام.</p>
+                        </div>
+                      </div>
+                      <span className="bg-white text-red-600 px-6 py-3 rounded-xl font-bold text-sm shadow-sm hidden md:block">
+                        فتح التطبيق &larr;
+                      </span>
+                    </a>
+                  </div>
+                )}
+
+                <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2"><HeartPulse className="text-blue-600"/> أطفالي ({myChildren.length})</h2>
+
+                {loading ? (
+                  <div className="text-center py-20 text-gray-500 font-bold">جاري تحميل البيانات...</div>
+                ) : myChildren.length === 0 ? (
+                  <div className="bg-white p-10 rounded-2xl shadow-sm text-center border border-gray-200">
+                    <Baby className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">لا يوجد أطفال مسجلين</h3>
+                    <p className="text-gray-500">لم تقم الإدارة بتسجيل أطفال في حسابك بعد.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {myChildren.map(child => (
+                      <div key={child.id} className="bg-white p-6 rounded-3xl shadow-sm border border-blue-100 hover:shadow-lg transition-all cursor-pointer group" onClick={() => openChildProfile(child)}>
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-2xl group-hover:scale-110 transition-transform">{child.name.charAt(0)}</div>
+                          <div>
+                            <h3 className="font-bold text-gray-800 text-xl">{child.name}</h3>
+                            <p className="text-sm text-blue-600 font-semibold mt-1">تاريخ الميلاد: {child.dob}</p>
+                          </div>
+                        </div>
+                        <div className="border-t border-gray-100 pt-4 mt-4 text-center text-gray-500 font-bold text-sm group-hover:text-blue-600 transition-colors">
+                          اضغط لرؤية الملف والتقارير &larr;
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </main>
+
+              {/* Child Profile Modal */}
+              {selectedChild && (
+                <div className="fixed inset-0 bg-blue-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-10">
+                  <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl flex flex-col max-h-full overflow-hidden">
+                    <div className="p-6 md:p-8 border-b flex justify-between items-start bg-gradient-to-l from-blue-50 to-white">
+                      <div className="flex items-center gap-5">
+                        <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-3xl shadow-md">{selectedChild.name.charAt(0)}</div>
+                        <div>
+                          <h2 className="text-2xl font-black text-gray-800">{selectedChild.name}</h2>
+                          <p className="text-gray-500 font-semibold mt-1 flex items-center gap-2"><Activity className="w-4 h-4"/> سجل التقارير والمتابعة</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setSelectedChild(null)} className="bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl transition-colors shadow-sm">&times;</button>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-8">
+                      {/* Sidebar Info */}
+                      <div className="space-y-6 md:col-span-1">
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                          <h4 className="font-bold text-gray-700 mb-3 border-b pb-2 flex justify-between items-center">
+                            الحالة الصحية
+                            {!editMedical && <button onClick={()=>setEditMedical(true)} className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200 font-bold">تعديل</button>}
+                          </h4>
+                          
+                          {editMedical ? (
+                            <div className="space-y-3 animate-in fade-in">
+                              <textarea value={medicalText} onChange={e=>setMedicalText(e.target.value)} className="w-full p-2 text-sm border rounded-lg focus:ring-2 outline-none" rows="3" placeholder="أضف حساسية طعام، مواعيد أدوية..."></textarea>
+                              <div className="flex gap-2">
+                                <button onClick={handleSaveMedical} disabled={savingMed} className="flex-1 bg-green-500 text-white text-xs font-bold py-2 rounded-lg">{savingMed?'جاري الحفظ...':'حفظ'}</button>
+                                <button onClick={()=>setEditMedical(false)} className="flex-1 bg-gray-200 text-gray-700 text-xs font-bold py-2 rounded-lg">إلغاء</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-600 leading-relaxed font-semibold">
+                              {selectedChild.medicalInfo || <span className="text-gray-400 italic">لا توجد ملاحظات طبية مسجلة.</span>}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                          <h4 className="font-bold text-gray-700 mb-3 border-b pb-2">معلومات أساسية</h4>
+                          <ul className="text-sm space-y-3 text-gray-600 font-semibold">
+                            <li className="flex justify-between"><span>تاريخ الميلاد:</span> <span className="text-gray-800" dir="ltr">{selectedChild.dob}</span></li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      {/* Reports Timeline */}
+                      <div className="md:col-span-2 space-y-6">
+                        <h3 className="font-black text-xl text-gray-800 flex items-center gap-2"><BookOpen className="text-blue-500 w-5 h-5"/> التقارير الأسبوعية المعتمدة</h3>
+                        
+                        {loadingReports ? (
+                           <div className="text-center py-10 text-gray-500 font-bold">جاري تحميل التقارير...</div>
+                        ) : childReports.length === 0 ? (
+                          <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-10 text-center text-gray-400 font-bold">
+                            لم يقم المعلم بإضافة تقارير لهذا الطفل بعد.
+                          </div>
+                        ) : (
+                          <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-blue-200 before:to-transparent">
+                            {childReports.map((report, index) => {
+                              const date = new Date(report.createdAt).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                              return (
+                                <div key={report.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-blue-500 text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                                    <BookOpen className="w-4 h-4" />
+                                  </div>
+                                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                                    <div className="flex items-center justify-between mb-3 border-b pb-2">
+                                      <h4 className="font-bold text-blue-700">{date}</h4>
+                                    </div>
+                                    <div className="space-y-3 text-sm">
+                                      <div>
+                                        <span className="font-bold text-gray-700 block mb-1">المستوى الدراسي:</span>
+                                        <p className="text-gray-600 bg-gray-50 p-2 rounded-lg">{report.academic}</p>
+                                      </div>
+                                      <div>
+                                        <span className="font-bold text-gray-700 block mb-1">المستوى المهاري:</span>
+                                        <p className="text-gray-600 bg-gray-50 p-2 rounded-lg">{report.skills}</p>
+                                      </div>
+                                      <div>
+                                        <span className="font-bold text-gray-700 block mb-1">الحالة الصحية:</span>
+                                        <p className="text-gray-600 bg-gray-50 p-2 rounded-lg">{report.health}</p>
+                                      </div>
+                                      {report.notes && (
+                                        <div>
+                                          <span className="font-bold text-gray-700 block mb-1">ملاحظات:</span>
+                                          <p className="text-gray-600 bg-orange-50 p-2 rounded-lg">{report.notes}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        const Login = ({ setRoute, setUser }) => {
+          const [email, setEmail] = useState('');
+          const [password, setPassword] = useState('');
+          const [error, setError] = useState('');
+          const [loading, setLoading] = useState(false);
+
+          const handleLogin = async (e) => {
+            e.preventDefault();
+            setLoading(true);
+            setError('');
+            
+            try {
+              const userCredential = await signInWithEmailAndPassword(auth, email, password);
+              const role = await getUserRole(userCredential.user.email);
+              setUser({ email: userCredential.user.email, role: role });
+              setRoute('dashboard');
+            } catch (err) {
+              setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+            }
+            setLoading(false);
+          };
+
+          return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50" dir="rtl">
+              <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-gray-100">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-black text-gray-800 tracking-tight">مونتي <span className="text-blue-600">سمارت</span></h2>
+                  <p className="text-gray-500 mt-2">تسجيل الدخول للنظام</p>
+                </div>
+                {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 text-sm font-bold text-center">{error}</div>}
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">البريد الإلكتروني</label>
+                    <input type="email" value={email} onChange={e=>setEmail(e.target.value.toLowerCase())} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" dir="ltr" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">كلمة المرور</label>
+                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" dir="ltr" />
+                  </div>
+                  <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-md disabled:opacity-50">
+                    {loading ? 'جاري التحقق...' : 'دخول'}
+                  </button>
+                </form>
+                <button onClick={() => setRoute('landing')} className="w-full mt-4 text-gray-500 hover:text-gray-800 text-sm font-bold transition-colors">العودة للرئيسية</button>
+              </div>
+            </div>
+          );
+        };
+
+        const LandingPage = ({ setRoute }) => {
+          const [whatsappNumber, setWhatsappNumber] = useState('');
+          const [lang, setLang] = useState('ar');
+
+          useEffect(() => {
+            const fetchWNumber = async () => {
+              try {
+                const docSnap = await getDoc(doc(db, 'settings', 'general'));
+                if (docSnap.exists() && docSnap.data().whatsapp) {
+                  setWhatsappNumber(docSnap.data().whatsapp);
+                }
+              } catch (error) { console.error(error); }
+            };
+            fetchWNumber();
+          }, []);
+
+          const toggleLanguage = () => {
+            setLang(prev => prev === 'ar' ? 'en' : 'ar');
+          };
+
+          return (
+            <div className={`lang-${lang} bg-[#f8fafc] text-[#334155] font-sans scroll-smooth antialiased`} dir={lang === 'ar' ? 'rtl' : 'ltr'} id="html-root">
+              <style dangerouslySetInnerHTML={{__html: `
+                .text-primary { color: #0d2b51 !important; }
+                .bg-primary { background-color: #0d2b51 !important; }
+                .border-primary { border-color: #0d2b51 !important; }
+                
+                .text-secondary { color: #009d94 !important; }
+                .bg-secondary { background-color: #009d94 !important; }
+                .border-secondary { border-color: #009d94 !important; }
+                
+                .text-accent { color: #f7a61c !important; }
+                .bg-accent { background-color: #f7a61c !important; }
+                .border-accent { border-color: #f7a61c !important; }
+
+                .lang-en [lang="ar"] { display: none !important; }
+                .lang-ar [lang="en"] { display: none !important; }
+
+                .lang-ar { font-family: 'Tajawal', sans-serif; }
+                .lang-en { font-family: 'Nunito', sans-serif; }
+
+                .hero-section {
+                    background: linear-gradient(rgba(13, 43, 81, 0.75), rgba(0, 157, 148, 0.65)),
+                                url('https://images.unsplash.com/photo-1516627145497-ae6968895b74?q=80&w=2000&auto=format&fit=crop') no-repeat center center/cover;
+                }
+
+                .hover-bounce:hover { transform: translateY(-8px); }
+                .transition-all { transition: all 0.3s ease-in-out; }
+                .blob-shape { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+
+                @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+                .animate-spin-slow { animation: spin-slow 6s linear infinite; }
+              `}} />
+
+              <nav className="bg-white/95 backdrop-blur-sm shadow-sm fixed w-full z-50 top-0 border-b border-gray-100">
+                <div className="container mx-auto px-6 py-3 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <img src="https://lh3.googleusercontent.com/d/1WkXPEeO1buvi5-ZTV69LrQG5Aenzem1h" alt="MontiSmart Logo" className="h-14 w-auto rounded object-contain" />
+                        <div className="hidden sm:block">
+                            <span className="text-2xl font-bold text-primary block leading-none" lang="ar">مونتي<span className="text-secondary">سمارت</span></span>
+                            <span className="text-2xl font-bold text-primary block leading-none" lang="en">Monti<span className="text-secondary">Smart</span></span>
+                        </div>
+                    </div>
+
+                    <div className="hidden md:flex gap-6 items-center">
+                        <a href="#home" className="text-gray-600 hover:text-secondary font-bold transition">
+                            <span lang="ar">الرئيسية</span><span lang="en">Home</span>
+                        </a>
+                        <a href="#about" className="text-gray-600 hover:text-secondary font-bold transition">
+                            <span lang="ar">عن الحضانة</span><span lang="en">About Us</span>
+                        </a>
+                        <a href="#smart-features" className="text-gray-600 hover:text-secondary font-bold transition">
+                            <span lang="ar">الأنظمة الذكية</span><span lang="en">Smart Features</span>
+                        </a>
+                        <a href="#programs" className="text-gray-600 hover:text-secondary font-bold transition">
+                            <span lang="ar">البرامج</span><span lang="en">Programs</span>
+                        </a>
+                        
+                        <button onClick={() => setRoute('login')} className="text-gray-600 hover:text-secondary font-bold transition flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                            <span lang="ar">الكاميرات</span><span lang="en">Live Cam</span>
+                        </button>
+
+                        <a href="#contact" className="bg-accent text-white px-6 py-2 rounded-full hover:bg-yellow-500 transition font-bold shadow-md">
+                            <span lang="ar">تواصل معنا</span><span lang="en">Contact Us</span>
+                        </a>
+
+                        <button onClick={toggleLanguage} className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-primary px-3 py-1.5 rounded-lg transition font-bold border border-gray-200 ml-2 mr-2">
+                            <i className="fas fa-globe"></i>
+                            <span>{lang === 'ar' ? 'English' : 'عربي'}</span>
+                        </button>
+                    </div>
+
+                    <div className="md:hidden flex items-center gap-3">
+                        <button onClick={toggleLanguage} className="text-primary font-bold bg-gray-100 px-2 py-1 rounded">
+                            <span>{lang === 'ar' ? 'EN' : 'AR'}</span>
+                        </button>
+                        <button className="text-primary text-2xl focus:outline-none">
+                            <i className="fas fa-bars"></i>
+                        </button>
+                    </div>
+                </div>
+              </nav>
+
+              <section id="home" className="hero-section min-h-screen flex items-center text-center text-white pt-20 relative overflow-hidden">
+                <div className="absolute top-20 right-10 opacity-20 animate-bounce" style={{ animationDuration: '3s' }}><i className="fas fa-star text-6xl text-accent"></i></div>
+                <div className="absolute bottom-20 left-10 opacity-20 animate-bounce" style={{ animationDuration: '4s' }}><i className="fas fa-shapes text-6xl text-white"></i></div>
+
+                <div className="container mx-auto px-6 relative z-10">
+                    <h1 className="text-4xl md:text-7xl font-extrabold mb-6 drop-shadow-lg">
+                        <span lang="ar">مرحباً بكم في <span className="text-accent">مونتي سمارت</span></span>
+                        <span lang="en">Welcome to <span className="text-accent">MontiSmart</span></span>
+                    </h1>
+
+                    <p className="text-2xl md:text-3xl mb-6 font-bold text-gray-100 drop-shadow-md">
+                        <span lang="ar">أول حضانة ذكية للأطفال في بني سويف</span>
+                        <span lang="en">The First Smart Preschool in Beni Suef</span>
+                    </p>
+
+                    <p className="text-lg md:text-xl mb-10 max-w-3xl mx-auto font-medium text-gray-200 leading-relaxed bg-black/20 p-4 rounded-2xl backdrop-blur-sm">
+                        <span lang="ar">نجمع بين عراقة منهج المونتيسوري وقوة التكنولوجيا (IoT) لنصنع مستقبلاً مشرقاً وآمناً لطفلك من عمر سنة إلى 5 سنوات. يتعلم، يستكشف، ويبدع!</span>
+                        <span lang="en">Combining the authentic Montessori method with the power of Technology (IoT) to build a bright and safe future for your child (Ages 1-5). Learn, Explore, Create!</span>
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row justify-center gap-4">
+                        <a href="#about" className="bg-secondary hover:bg-teal-500 text-white font-bold py-3 px-8 rounded-full transition-all text-lg shadow-lg hover:scale-105 border-2 border-secondary">
+                            <span lang="ar">اكتشف عالمنا</span><span lang="en">Explore Our World</span>
+                        </a>
+                        <a href="#contact" className="bg-primary hover:bg-blue-900 text-white font-bold py-3 px-8 rounded-full transition-all text-lg shadow-lg hover:scale-105 border-2 border-primary">
+                            <span lang="ar">احجز مقعداً لطفلك</span><span lang="en">Book a Seat</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div className="absolute bottom-0 w-full overflow-hidden leading-none">
+                    <svg className="relative block w-full h-[50px] md:h-[100px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                        <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118,130.41,113.88,189.56,97.7,233.15,85.64,277.62,72.48,321.39,56.44Z" fill="#f8fafc"></path>
+                    </svg>
+                </div>
+              </section>
+
+              <section id="about" className="py-20 relative">
+                <div className="container mx-auto px-6">
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl md:text-5xl font-extrabold text-primary mb-4">
+                            <span lang="ar">لماذا <span className="text-secondary">مونتي سمارت؟</span></span>
+                            <span lang="en">Why <span className="text-secondary">MontiSmart?</span></span>
+                        </h2>
+                        <div className="h-2 w-24 bg-accent mx-auto rounded-full mb-6"></div>
+                        <p className="text-gray-600 max-w-2xl mx-auto text-lg">
+                            <span lang="ar">نحن لسنا مجرد حضانة، بل بيئة تعليمية متكاملة تهدف إلى تنمية قدرات طفلك في بيئة ذكية وآمنة.</span>
+                            <span lang="en">We are not just a preschool; we are an integrated educational environment designed to develop your child's skills safely.</span>
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="bg-white p-8 rounded-3xl text-center shadow-lg border-b-4 border-secondary hover-bounce transition-all relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-secondary opacity-10 blob-shape -mr-4 -mt-4"></div>
+                            <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                <i className="fas fa-shapes text-secondary text-4xl"></i>
+                            </div>
+                            <h3 className="text-2xl font-bold text-primary mb-3">
+                                <span lang="ar">منهج مونتيسوري</span><span lang="en">Montessori Method</span>
+                            </h3>
+                            <p className="text-gray-600 font-medium">
+                                <span lang="ar">تعلم قائم على فلسفة منتيسوري بأدوات خشبية طبيعية لتنمية استقلالية الطفل واكتشاف مهاراته.</span>
+                                <span lang="en">Learning based on Montessori philosophy using natural wooden tools to develop child's independence.</span>
+                            </p>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-3xl text-center shadow-lg border-b-4 border-accent hover-bounce transition-all relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-accent opacity-10 blob-shape -mr-4 -mt-4"></div>
+                            <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                <i className="fas fa-robot text-accent text-4xl"></i>
+                            </div>
+                            <h3 className="text-2xl font-bold text-primary mb-3">
+                                <span lang="ar">تكنولوجيا ذكية و Robotics</span><span lang="en">Smart Tech & Robotics</span>
+                            </h3>
+                            <p className="text-gray-600 font-medium">
+                                <span lang="ar">دمج المساعدات الصوتية (أليكسا) والروبوتات في اللعب ليعتاد الطفل على تطورات الذكاء الاصطناعي بشكل آمن.</span>
+                                <span lang="en">Integrating Voice Assistants (Alexa) and robots in play so children adapt to AI advancements safely.</span>
+                            </p>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-3xl text-center shadow-lg border-b-4 border-primary hover-bounce transition-all relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-primary opacity-10 blob-shape -mr-4 -mt-4"></div>
+                            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                <i className="fas fa-shield-cat text-primary text-4xl"></i>
+                            </div>
+                            <h3 className="text-2xl font-bold text-primary mb-3">
+                                <span lang="ar">أمان تام وبيئة صحية</span><span lang="en">Absolute Safety & Health</span>
+                            </h3>
+                            <p className="text-gray-600 font-medium">
+                                <span lang="ar">أنظمة أمان كهربائي وكاميرات مراقبة وأجهزة تنقية هواء لضمان صحة وسلامة أطفالنا على مدار اليوم.</span>
+                                <span lang="en">Electrical safety systems, cameras, and air purifiers to ensure our children's health and safety all day.</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+              </section>
+
+              <section id="smart-features" className="py-20 bg-white">
+                <div className="container mx-auto px-6">
+                    <div className="bg-blue-50 rounded-3xl p-8 md:p-12 shadow-sm border border-blue-100">
+                        <div className="text-center mb-16">
+                            <span className="bg-primary text-white text-sm font-bold px-4 py-1 rounded-full mb-3 inline-block">Smart IoT</span>
+                            <h2 className="text-3xl md:text-4xl font-extrabold text-primary mb-4 mt-4">
+                                <span lang="ar">حضانة <span className="text-secondary">سمارت</span> بالكامل</span>
+                                <span lang="en">Fully <span className="text-secondary">Smart</span> Preschool</span>
+                            </h2>
+                            <p className="text-gray-600 max-w-3xl mx-auto text-lg">
+                                <span lang="ar">جهزنا الحضانة بأحدث التقنيات لضمان أقصى درجات الأمان والتعليم التفاعلي.</span>
+                                <span lang="en">Equipped with the latest technologies to ensure maximum safety and interactive learning.</span>
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-16">
+                            <div>
+                                <h3 className="text-2xl font-bold text-primary mb-4 flex items-center gap-3">
+                                    <div className="bg-accent text-white p-3 rounded-xl"><i className="fas fa-bolt"></i></div>
+                                    <span lang="ar">نظام عوازل الكهرباء الذكي (ELCB)</span>
+                                    <span lang="en">Smart Electrical Insulation (ELCB)</span>
+                                </h3>
+                                <p className="text-gray-700 leading-relaxed mb-4 font-medium">
+                                    <span lang="ar">حماية طفلك أولويتنا. الحضانة مزودة بنظام فصل التيار اللحظي.</span>
+                                    <span lang="en">Your child's safety is our priority. Equipped with instant circuit breakers.</span>
+                                </p>
+                                <ul className="space-y-3 text-gray-600">
+                                    <li className="flex items-start gap-3">
+                                        <i className="fas fa-check-circle text-secondary mt-1"></i>
+                                        <span lang="ar">في حالة لمس الطفل لأي مصدر كهربائي، يتم فصل التيار فوراً.</span>
+                                        <span lang="en">Instantly cuts power if a child touches any electrical source.</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <i className="fas fa-check-circle text-secondary mt-1"></i>
+                                        <span lang="ar">يمنع حدوث أي ضرر نهائياً، بيئة استكشاف آمنة 100%.</span>
+                                        <span lang="en">Prevents any harm absolutely, 100% safe exploration environment.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div className="rounded-2xl overflow-hidden shadow-lg border-4 border-white transform rotate-2 hover:rotate-0 transition-all">
+                               <img src="https://images.unsplash.com/photo-1594608661623-aa0bd3a69d98?q=80&w=1000&auto=format&fit=crop" alt="Safe Kids" className="w-full h-64 object-cover" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-16 flex-col-reverse md:flex-row-reverse">
+                            <div className="rounded-2xl overflow-hidden shadow-lg border-4 border-white transform -rotate-2 hover:rotate-0 transition-all">
+                                <img src="https://images.unsplash.com/photo-1546776310-eef45dd6d63c?q=80&w=1000&auto=format&fit=crop" alt="Smart Robot" className="w-full h-64 object-cover" />
+                            </div>
+                            <div>
+                                <h3 className="text-2xl font-bold text-primary mb-4 flex items-center gap-3">
+                                    <div className="bg-secondary text-white p-3 rounded-xl"><i className="fas fa-robot"></i></div>
+                                    <span lang="ar">المساعد الصوتي والروبوت التفاعلي</span>
+                                    <span lang="en">Voice Assistant & Interactive Robot</span>
+                                </h3>
+                                <ul className="space-y-3 text-gray-600 font-medium">
+                                    <li className="flex items-start gap-3">
+                                        <i className="fas fa-star text-accent mt-1"></i>
+                                        <span lang="ar"><strong>أليكسا للتعليم:</strong> مساعدة الأطفال في النطق، الحساب، وسرد القصص الممتعة.</span>
+                                        <span lang="en"><strong>Alexa for Education:</strong> Helps with pronunciation, math, and storytelling.</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <i className="fas fa-star text-accent mt-1"></i>
+                                        <span lang="ar"><strong>روبوت الصحة:</strong> روبوت ودود يلعب مع الأطفال ويقوم بقياس درجة حرارتهم يومياً بأمان.</span>
+                                        <span lang="en"><strong>Health Robot:</strong> Friendly robot plays with kids and checks daily temperatures.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                            <div>
+                                <h3 className="text-2xl font-bold text-primary mb-4 flex items-center gap-3">
+                                    <div className="bg-primary text-white p-3 rounded-xl"><i className="fas fa-wind"></i></div>
+                                    <span lang="ar">هواء نقي وبيئة صحية</span>
+                                    <span lang="en">Pure Air & Healthy Environment</span>
+                                </h3>
+                                <ul className="space-y-3 text-gray-600 font-medium">
+                                    <li className="flex items-start gap-3">
+                                        <i className="fas fa-leaf text-secondary mt-1"></i>
+                                        <span lang="ar"><strong>منقيات هواء:</strong> فلاتر عالية الجودة لإزالة الملوثات والفيروسات من الفصول.</span>
+                                        <span lang="en"><strong>Air Purifiers:</strong> High-quality filters to remove pollutants and viruses.</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <i className="fas fa-leaf text-secondary mt-1"></i>
+                                        <span lang="ar"><strong>حساسات ذكية:</strong> قياس نسبة الرطوبة وثاني أكسيد الكربون وتشغيل التهوية تلقائياً.</span>
+                                        <span lang="en"><strong>Smart Sensors:</strong> Measures humidity and CO2, activating ventilation automatically.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div className="rounded-2xl overflow-hidden shadow-lg border-4 border-white transform rotate-1 hover:rotate-0 transition-all bg-white p-6 text-center flex flex-col justify-center h-64">
+                                <i className="fas fa-fan text-6xl text-secondary mb-4 animate-spin-slow"></i>
+                                <h4 className="text-xl font-bold text-primary">
+                                    <span lang="ar">حماية تنفسية متكاملة</span><span lang="en">Complete Respiratory Protection</span>
+                                </h4>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+              </section>
+
+              <section id="live-cam" className="py-20 bg-primary text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary opacity-20 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+
+                <div className="container mx-auto px-6 relative z-10">
+                     <div className="flex flex-col lg:flex-row items-center gap-12">
+                        <div className="lg:w-1/2">
+                            <div className="inline-flex items-center gap-2 bg-red-500/20 text-red-100 px-4 py-2 rounded-full mb-6 border border-red-500/30">
+                                <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+                                <span className="font-bold tracking-wider" lang="ar">بث مباشر للآباء</span>
+                                <span className="font-bold tracking-wider" lang="en">LIVE STREAM FOR PARENTS</span>
+                            </div>
+
+                            <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight">
+                                <span lang="ar">كيف يرى الآباء أطفالهم؟</span>
+                                <span lang="en">How Do Parents See Their Children?</span>
+                            </h2>
+
+                            <p className="mb-8 text-lg text-blue-100 font-medium">
+                                <span lang="ar">نوفر منظومة بث مباشر مستمر من خلال كاميرات داخل كل فصل، متصلة بالموقع والتطبيق الخاص بنا لتطمئن على طفلك في أي وقت.</span>
+                                <span lang="en">We provide continuous live streaming via cameras in every class, connected to our website/app so you can check on your child anytime.</span>
+                            </p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+                                <div className="bg-white/10 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+                                    <i className="fas fa-lock text-3xl text-accent mb-3"></i>
+                                    <h4 className="font-bold mb-1"><span lang="ar">خصوصية تامة</span><span lang="en">Total Privacy</span></h4>
+                                    <p className="text-sm text-blue-200"><span lang="ar">لا يرى الطفل إلا ولي الأمر الخاص به.</span><span lang="en">Only parents can view their own child's class.</span></p>
+                                </div>
+                                <div className="bg-white/10 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+                                    <i className="fas fa-user-shield text-3xl text-secondary mb-3"></i>
+                                    <h4 className="font-bold mb-1"><span lang="ar">حساب آمن</span><span lang="en">Secure Login</span></h4>
+                                    <p className="text-sm text-blue-200"><span lang="ar">دخول بيوزر وباسورد مخصص لكل ولي أمر.</span><span lang="en">Access via unique Username and Password.</span></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:w-1/2 w-full">
+                            <div className="bg-gray-900 p-2 rounded-2xl shadow-2xl border border-gray-700 relative">
+                                <div className="absolute top-4 left-6 z-10 flex items-center gap-2">
+                                     <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1 shadow"><span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> REC</span>
+                                     <span className="bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-md">
+                                         <span lang="ar">فصل الفراشات (Montessori)</span><span lang="en">Butterflies Class (Montessori)</span>
+                                     </span>
+                                </div>
+                                <img src="https://images.unsplash.com/photo-1587691592099-24045742c181?q=80&w=2073&auto=format&fit=crop" alt="Kids in Class" className="w-full h-auto rounded-xl opacity-90" />
+
+                                <div className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+                                    <button onClick={() => setRoute('login')} className="bg-white text-primary font-bold px-8 py-4 rounded-2xl shadow-2xl hover:scale-105 transition-all flex flex-col items-center gap-2">
+                                        <i className="fas fa-video text-secondary text-3xl"></i>
+                                        <span lang="ar">افتح بوابة أولياء الأمور</span>
+                                        <span lang="en">Open Parents Portal</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 bg-white text-primary p-4 rounded-xl shadow-lg border border-gray-100 flex items-center justify-between">
+                                 <div>
+                                     <h5 className="font-bold flex items-center gap-2">
+                                         <i className="fas fa-comments text-secondary"></i>
+                                         <span lang="ar">تواصل مع معلمات الفصل</span><span lang="en">Contact Teachers</span>
+                                     </h5>
+                                     <p className="text-sm text-gray-500 font-medium">
+                                         <span lang="ar">مدرسات التكنولوجيا والمنتيسوري والإدارة.</span>
+                                         <span lang="en">Tech & Montessori Teachers, Admin.</span>
+                                     </p>
+                                 </div>
+                                 <button onClick={() => setRoute('login')} className="bg-accent text-white font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 transition shadow">
+                                     <span lang="ar">محادثة</span><span lang="en">Chat</span>
+                                 </button>
+                            </div>
+                        </div>
+                     </div>
+                </div>
+              </section>
+
+              <section id="programs" className="py-20 bg-gray-50">
+                <div className="container mx-auto px-6">
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl md:text-4xl font-extrabold text-primary mb-4">
+                            <span lang="ar">برامجنا وأنظمة <span className="text-accent">الاشتراك</span></span>
+                            <span lang="en">Programs & <span className="text-accent">Pricing</span></span>
+                        </h2>
+                        <div className="h-2 w-24 bg-secondary mx-auto rounded-full mb-4"></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-16">
+                        <div className="bg-white p-6 border border-gray-100 rounded-2xl hover:shadow-xl transition-shadow text-center group cursor-default">
+                            <div className="w-16 h-16 mx-auto bg-blue-50 text-primary rounded-full flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform"><i className="fas fa-book-open"></i></div>
+                            <h4 className="font-bold text-lg mb-2 text-primary"><span lang="ar">الترم الأول</span><span lang="en">First Term</span></h4>
+                            <p className="text-sm text-gray-500"><span lang="ar">بناء الأساس وتنمية المهارات الأساسية.</span><span lang="en">Building foundation & basic skills.</span></p>
+                        </div>
+                        <div className="bg-white p-6 border border-gray-100 rounded-2xl hover:shadow-xl transition-shadow text-center group cursor-default">
+                            <div className="w-16 h-16 mx-auto bg-teal-50 text-secondary rounded-full flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform"><i className="fas fa-puzzle-piece"></i></div>
+                            <h4 className="font-bold text-lg mb-2 text-primary"><span lang="ar">الترم الثاني</span><span lang="en">Second Term</span></h4>
+                            <p className="text-sm text-gray-500"><span lang="ar">تنمية الاستقلالية والقدرات الفكرية.</span><span lang="en">Developing independence & intellect.</span></p>
+                        </div>
+                        <div className="bg-yellow-50 p-6 border border-yellow-100 rounded-2xl hover:shadow-xl transition-shadow text-center group cursor-default">
+                            <div className="w-16 h-16 mx-auto bg-white text-accent rounded-full flex items-center justify-center text-2xl mb-4 shadow-sm group-hover:scale-110 transition-transform"><i className="fas fa-sun"></i></div>
+                            <h4 className="font-bold text-lg mb-2 text-accent"><span lang="ar">الكامب الصيفي</span><span lang="en">Summer Camp</span></h4>
+                            <p className="text-sm text-gray-600"><span lang="ar">أنشطة مرحة وتجارب ممتعة.</span><span lang="en">Fun activities and experiences.</span></p>
+                        </div>
+                        <div className="bg-blue-50 p-6 border border-blue-100 rounded-2xl hover:shadow-xl transition-shadow text-center group cursor-default">
+                            <div className="w-16 h-16 mx-auto bg-white text-blue-500 rounded-full flex items-center justify-center text-2xl mb-4 shadow-sm group-hover:scale-110 transition-transform"><i className="fas fa-snowflake"></i></div>
+                            <h4 className="font-bold text-lg mb-2 text-blue-600"><span lang="ar">الكامب الشتوي</span><span lang="en">Winter Camp</span></h4>
+                            <p className="text-sm text-gray-600"><span lang="ar">تجربة شتوية للحفاظ على نشاط الطفل.</span><span lang="en">Winter experience to keep kids active.</span></p>
+                        </div>
+                    </div>
+
+                    <div className="bg-primary text-white rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden max-w-5xl mx-auto">
+                        <div className="absolute top-0 right-0 rtl:right-auto rtl:left-0 bg-accent text-primary font-black px-10 py-3 rounded-bl-3xl shadow-lg rtl:rounded-bl-none rtl:rounded-br-3xl text-xl uppercase transform hover:scale-105 transition-transform">
+                            30% OFF
+                        </div>
+
+                        <div className="text-center mb-10">
+                            <h3 className="text-3xl font-bold text-accent mb-2">
+                                <span lang="ar">عرض افتتاح فرع بني سويف!</span>
+                                <span lang="en">Beni Suef Branch Opening Offer!</span>
+                            </h3>
+                            <p className="text-xl text-blue-200">
+                                <span lang="ar">لأول دفعة فقط (مقدار مخفض)</span><span lang="en">For the first batch only</span>
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center divide-y md:divide-y-0 md:divide-x md:rtl:divide-x-reverse divide-blue-800">
+                            <div className="p-4">
+                                <p className="text-blue-300 mb-2 font-medium"><span lang="ar">في السنة</span><span lang="en">Per Year</span></p>
+                                <div className="text-4xl font-extrabold text-secondary mb-2">24,000 <span className="text-xl font-bold"><span lang="ar">ج.م</span><span lang="en">EGP</span></span></div>
+                                <p className="line-through text-gray-400 text-sm"><span lang="ar">بدلاً من 34,000 ج.م</span><span lang="en">Instead of 34,000 EGP</span></p>
+                            </div>
+
+                            <div className="p-4">
+                                <p className="text-blue-300 mb-2 font-medium"><span lang="ar">دفعة مقدمة (لفتح الملف والتطبيق)</span><span lang="en">Down Payment (Enrollment & App)</span></p>
+                                <div className="text-4xl font-extrabold mb-2">4,000 <span className="text-xl font-bold"><span lang="ar">ج.م</span><span lang="en">EGP</span></span></div>
+                            </div>
+
+                            <div className="p-4">
+                                <p className="text-blue-300 mb-2 font-medium"><span lang="ar">قسط شهري (لمدة 10 أشهر)</span><span lang="en">Monthly Installment (10 Months)</span></p>
+                                <div className="text-4xl font-extrabold mb-2">2,000 <span className="text-xl font-bold"><span lang="ar">ج.م</span><span lang="en">EGP</span></span></div>
+                            </div>
+                        </div>
+
+                        <div className="mt-10 mx-auto max-w-md bg-secondary/20 border border-secondary/50 p-4 rounded-xl flex items-center justify-center gap-4 text-center text-white">
+                            <i className="fas fa-bus text-3xl text-accent"></i>
+                            <div>
+                                <strong className="block text-lg"><span lang="ar">الباص علينا!</span><span lang="en">Bus is on us!</span></strong>
+                                <span className="text-sm text-blue-100"><span lang="ar">خدمة مواصلات آمنة ومريحة مجاناً.</span><span lang="en">Free, safe, & comfortable transportation.</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+              </section>
+
+              <footer id="contact" className="bg-gray-900 text-gray-300 py-12 border-t-4 border-secondary">
+                <div className="container mx-auto px-6">
+                    <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-700 pb-10 mb-8 gap-8">
+                       <div className="text-center md:text-start flex flex-col items-center md:items-start">
+                            <div className="bg-white p-2 rounded-lg mb-4 inline-block">
+                                <img src="https://lh3.googleusercontent.com/d/1WkXPEeO1buvi5-ZTV69LrQG5Aenzem1h" alt="MontiSmart Logo" className="h-12 w-auto" />
+                            </div>
+                            <p className="text-sm max-w-xs leading-relaxed text-gray-400">
+                                <span lang="ar">أول حضانة ذكية في الصعيد. يتعلم . يستكشف . يبدع.</span>
+                                <span lang="en">The first smart preschool in Upper Egypt. Learn . Explore . Create.</span>
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col gap-4 text-center md:text-start font-medium">
+                            <a href={`https://wa.me/${whatsappNumber || '201152147430'}`} target="_blank" rel="noreferrer" className="hover:text-accent transition flex items-center justify-center md:justify-start gap-3 text-lg">
+                                <i className="fab fa-whatsapp text-green-500 text-2xl"></i> <span dir="ltr">{whatsappNumber || '0115 214 7430'}</span>
+                            </a>
+                            <p className="flex items-center justify-center md:justify-start gap-3 text-gray-400">
+                                <i className="fas fa-map-marker-alt text-secondary"></i>
+                                <span lang="ar">مدينة بني سويف - كورنيش النيل (بالقرب من قاعة المؤتمرات)</span>
+                                <span lang="en">Beni Suef City - Nile Corniche (Near Conference Hall)</span>
+                            </p>
+                            <a href="#" className="hover:text-blue-400 transition flex items-center justify-center md:justify-start gap-3">
+                                <i className="fab fa-facebook text-blue-500 text-xl"></i> montiSmart.eg
+                            </a>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 font-bold">
+                        <p>
+                            <span lang="ar">جميع الحقوق محفوظة &copy; 2026 لحضانة مونتي سمارت.</span>
+                            <span lang="en">All Rights Reserved &copy; 2026 MontiSmart Preschool.</span>
+                        </p>
+                        <div className="mt-4 md:mt-0 flex gap-3 text-secondary">
+                            <span>Montessori</span> &bull; <span>STEM</span> &bull; <span>Robotics</span> &bull; <span>Future Skills</span>
+                        </div>
+                    </div>
+                </div>
+              </footer>
+
+              {whatsappNumber && (
+                <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noreferrer" className="fixed bottom-6 right-6 bg-green-500 text-white p-4 rounded-full shadow-2xl hover:bg-green-600 hover:scale-110 transition-all z-50 flex items-center justify-center">
+                    <i className="fab fa-whatsapp text-3xl"></i>
+                </a>
+              )}
+
+            </div>
+          );
+        };
+
+        function App() {
+          const [route, setRoute] = useState('landing');
+          const [user, setUser] = useState(null);
+
+          useEffect(() => {
+            const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+              if (currentUser) {
+                const role = await getUserRole(currentUser.email);
+                setUser({ email: currentUser.email, role: role });
+                setRoute('dashboard');
+              } else {
+                setUser(null);
+              }
+            });
+            return () => unsubscribe();
+          }, []);
+
+          const handleLogout = async () => {
+            await signOut(auth);
+            setUser(null);
+            setRoute('landing');
+          };
+
+          if (route === 'landing') return <LandingPage setRoute={setRoute} />;
+          if (route === 'login') return <Login setRoute={setRoute} setUser={setUser} />;
+          
+          if (route === 'dashboard' && user) {
+            if (user.role === 'admin') return <AdminDashboard handleLogout={handleLogout} user={user} />;
+            if (user.role === 'teacher') return <TeacherDashboard handleLogout={handleLogout} user={user} />;
+            if (user.role === 'parent') return <ParentDashboard handleLogout={handleLogout} user={user} />;
+          }
+
+          return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-blue-600 font-bold">جاري التحميل...</div>;
+        }
+
+        // تشغيل تطبيق React داخل وسم الـ root
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
