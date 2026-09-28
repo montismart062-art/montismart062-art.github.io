@@ -1370,7 +1370,7 @@
                 </div>
               </section>
 
-              <footer id="contact" className="bg-gray-900 text-gray-300 py-12 border-t-4 border-secondary">
+             <footer id="contact" className="bg-gray-900 text-gray-300 py-12 border-t-4 border-secondary">
                 <div className="container mx-auto px-6">
                     <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-700 pb-10 mb-8 gap-8">
                        <div className="text-center md:text-start flex flex-col items-center md:items-start">
@@ -1383,18 +1383,31 @@
                             </p>
                         </div>
 
-                        <div className="flex flex-col gap-4 text-center md:text-start font-medium">
-                            <a href={`https://wa.me/${whatsappNumber || '201152147430'}`} target="_blank" rel="noreferrer" className="hover:text-accent transition flex items-center justify-center md:justify-start gap-3 text-lg">
-                                <i className="fab fa-whatsapp text-green-500 text-2xl"></i> <span dir="ltr">{whatsappNumber || '0115 214 7430'}</span>
-                            </a>
+                        <div className="flex flex-col gap-5 text-center md:text-start font-medium">
+                            {/* نص العنوان */}
                             <p className="flex items-center justify-center md:justify-start gap-3 text-gray-400">
-                                <i className="fas fa-map-marker-alt text-secondary"></i>
+                                <i className="fas fa-map-marker-alt text-secondary text-xl"></i>
                                 <span lang="ar">مدينة بني سويف - كورنيش النيل (بالقرب من قاعة المؤتمرات)</span>
                                 <span lang="en">Beni Suef City - Nile Corniche (Near Conference Hall)</span>
                             </p>
-                            <a href="#" className="hover:text-blue-400 transition flex items-center justify-center md:justify-start gap-3">
-                                <i className="fab fa-facebook text-blue-500 text-xl"></i> montiSmart.eg
-                            </a>
+
+                            {/* الأيقونات فقط (بدون نصوص) */}
+                            <div className="flex items-center justify-center md:justify-start gap-6 mt-2">
+                                {/* أيقونة الواتساب */}
+                                <a href={`https://wa.me/${whatsappNumber || '201152147430'}`} target="_blank" rel="noreferrer" className="hover:scale-110 transition-transform">
+                                    <i className="fab fa-whatsapp text-green-500 text-4xl"></i>
+                                </a>
+                                
+                                {/* أيقونة الفيسبوك */}
+                                <a href="https://www.facebook.com/share/1CM9pGrmMN/" target="_blank" rel="noreferrer" className="hover:scale-110 transition-transform">
+                                    <i className="fab fa-facebook text-blue-600 text-4xl"></i>
+                                </a>
+                                
+                                {/* أيقونة جوجل مابس */}
+                                <a href="https://maps.app.goo.gl/zgAjwCdH5CGzc9iV7" target="_blank" rel="noreferrer" className="hover:scale-110 transition-transform">
+                                    <i className="fas fa-map-marked-alt text-red-500 text-4xl"></i>
+                                </a>
+                            </div>
                         </div>
                     </div>
 
