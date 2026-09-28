@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.montismart.app",
+        "sha256_cert_fingerprints": ["0A:4F:94:B1:B7:8C:26:E2:A9:E0:4E:47:51:E5:54:5B:4C:A1:C7:73:6B:67:21:B1:4D:04:9A:51:55:19:11:AB"]
+      }
+    }]
