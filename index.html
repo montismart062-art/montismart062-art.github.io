@@ -899,6 +899,7 @@
         const LandingPage = ({ setRoute }) => {
           const [whatsappNumber, setWhatsappNumber] = useState('');
           const [lang, setLang] = useState('ar');
+          const [isMenuOpen, setIsMenuOpen] = useState(false); // الحالة الجديدة للتحكم في القائمة
 
           useEffect(() => {
             const fetchWNumber = async () => {
@@ -993,11 +994,29 @@
                         <button onClick={toggleLanguage} className="text-primary font-bold bg-gray-100 px-2 py-1 rounded">
                             <span>{lang === 'ar' ? 'EN' : 'AR'}</span>
                         </button>
-                        <button className="text-primary text-2xl focus:outline-none">
-                            <i className="fas fa-bars"></i>
+                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-primary text-2xl focus:outline-none w-8 h-8 flex items-center justify-center">
+                            <i className={isMenuOpen ? "fas fa-times" : "fas fa-bars"}></i>
                         </button>
                     </div>
                 </div>
+
+                {/* القائمة المنسدلة للموبايل */}
+                {isMenuOpen && (
+                  <div className="md:hidden bg-white border-t border-gray-100 absolute w-full left-0 shadow-xl flex flex-col py-4 px-6 gap-4 font-bold">
+                    <a href="#home" onClick={() => setIsMenuOpen(false)} className="text-gray-700 hover:text-secondary flex items-center gap-2"><i className="fas fa-home w-5"></i><span lang="ar">الرئيسية</span><span lang="en">Home</span></a>
+                    <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-gray-700 hover:text-secondary flex items-center gap-2"><i className="fas fa-info-circle w-5"></i><span lang="ar">عن الحضانة</span><span lang="en">About Us</span></a>
+                    <a href="#smart-features" onClick={() => setIsMenuOpen(false)} className="text-gray-700 hover:text-secondary flex items-center gap-2"><i className="fas fa-robot w-5"></i><span lang="ar">الأنظمة الذكية</span><span lang="en">Smart Features</span></a>
+                    <a href="#programs" onClick={() => setIsMenuOpen(false)} className="text-gray-700 hover:text-secondary flex items-center gap-2"><i className="fas fa-book-open w-5"></i><span lang="ar">البرامج</span><span lang="en">Programs</span></a>
+                    <button onClick={() => { setRoute('login'); setIsMenuOpen(false); }} className="text-gray-700 hover:text-secondary flex items-center gap-2 text-start">
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                        <span lang="ar">الكاميرات وولي الأمر</span><span lang="en">Cameras & Parents</span>
+                    </button>
+                    <div className="border-t border-gray-100 my-1"></div>
+                    <a href="#contact" onClick={() => setIsMenuOpen(false)} className="bg-accent text-white py-3 rounded-xl hover:bg-yellow-500 transition text-center shadow-sm">
+                        <span lang="ar">تواصل معنا</span><span lang="en">Contact Us</span>
+                    </a>
+                  </div>
+                )}
               </nav>
 
               <section id="home" className="hero-section min-h-screen flex items-center text-center text-white pt-20 relative overflow-hidden">
@@ -1005,7 +1024,7 @@
                 <div className="absolute bottom-20 left-10 opacity-20 animate-bounce" style={{ animationDuration: '4s' }}><i className="fas fa-shapes text-6xl text-white"></i></div>
 
                 <div className="container mx-auto px-6 relative z-10">
-                    <h1 className="text-4xl md:text-7xl font-extrabold mb-6 drop-shadow-lg">
+                    <h1 className="text-4xl md:text-7xl font-extrabold mb-6 drop-shadow-lg mt-8">
                         <span lang="ar">مرحباً بكم في <span className="text-accent">مونتي سمارت</span></span>
                         <span lang="en">Welcome to <span className="text-accent">MontiSmart</span></span>
                     </h1>
