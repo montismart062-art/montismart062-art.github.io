@@ -1391,9 +1391,9 @@
                                 <span lang="en">Beni Suef City - Nile Corniche (Near Conference Hall)</span>
                             </p>
 
-                            {/* الأيقونات فقط (بدون نصوص) */}
+                            {/* الأيقونات */}
                             <div className="flex items-center justify-center md:justify-start gap-6 mt-2">
-                                {/* أيقونة الواتساب */}
+                                {/* أيقونة الواتساب (متغيرة من الإدارة) */}
                                 <a href={`https://wa.me/${whatsappNumber || '201152147430'}`} target="_blank" rel="noreferrer" className="hover:scale-110 transition-transform">
                                     <i className="fab fa-whatsapp text-green-500 text-4xl"></i>
                                 </a>
@@ -1401,6 +1401,11 @@
                                 {/* أيقونة الفيسبوك */}
                                 <a href="https://www.facebook.com/share/1CM9pGrmMN/" target="_blank" rel="noreferrer" className="hover:scale-110 transition-transform">
                                     <i className="fab fa-facebook text-blue-600 text-4xl"></i>
+                                </a>
+
+                                {/* أيقونة إنستجرام */}
+                                <a href="https://www.instagram.com/montismart.eg?stkn=MTNyZzk3dHFucm9rdg==" target="_blank" rel="noreferrer" className="hover:scale-110 transition-transform">
+                                    <i className="fab fa-instagram text-pink-500 text-4xl"></i>
                                 </a>
                                 
                                 {/* أيقونة جوجل مابس */}
@@ -1423,6 +1428,7 @@
                 </div>
               </footer>
 
+              {/* زرار الواتساب العائم (متغير من الإدارة) */}
               {whatsappNumber && (
                 <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noreferrer" className="fixed bottom-6 right-6 bg-green-500 text-white p-4 rounded-full shadow-2xl hover:bg-green-600 hover:scale-110 transition-all z-50 flex items-center justify-center">
                     <i className="fab fa-whatsapp text-3xl"></i>
